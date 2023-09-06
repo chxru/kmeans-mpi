@@ -1,8 +1,9 @@
-from mpi4py import MPI
+import csv
 import numpy as np
+from mpi4py import MPI
+
 from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
-import csv
 
 np.random.seed(1234)
 
@@ -10,23 +11,26 @@ K = 3
 M = 2
 max_iter = 10
 
+
 def load_data(filename):
     data = []
-    with open(filename, 'r') as csvfile:
+    with open(filename, "r") as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             data.append([float(x) for x in row])
     return np.array(data)
 
+
 def count_csv_rows(csv_file):
     row_count = 0
-    with open(csv_file, 'r') as file:
+    with open(csv_file, "r") as file:
         reader = csv.reader(file)
         for row in reader:
             row_count += 1
     return row_count
 
-filename = 'data_1000.csv'
+
+filename = "data_1000.csv"
 
 X = load_data(filename)
 
@@ -40,10 +44,12 @@ size = comm.Get_size()
 # split data into chunks
 N_per_process = N // size
 
-start_row = rank*N_per_process
-end_row = N_per_process*(rank+1)-1
+start_row = rank * N_per_process
+end_row = N_per_process * (rank + 1) - 1
 
-data = np.loadtxt(filename, delimiter=',', skiprows=start_row, max_rows=end_row-start_row+1)
+data = np.loadtxt(
+    filename, delimiter=",", skiprows=start_row, max_rows=end_row - start_row + 1
+)
 parallel_kmeans = ParallelKMeans(data=data, K=K, D=M)
 parallel_kmeans.fit(max_iter)
 
