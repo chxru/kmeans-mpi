@@ -55,7 +55,12 @@ print(f"Parallel Processing takes {para_endTime - para_startTime:0.4f} seconds f
 print(f"Whole Processing takes {para_endTime - dt_StartTime:0.4f} seconds for processor {rank+1}")
 
 if rank == 0:
+    # Data Loader Start time for Sequential and Scikit Processing 
+    dta_startTime = t.perf_counter()
     X = load_csv_data(filename)
+    # Data Loader End time for Sequential and Scikit Processing 
+    dta_endTime = t.perf_counter()
+    print(f"Alternate Data Loader takes {dta_endTime - dta_startTime:0.4f} seconds for processor {rank+1}")
 
     # Time Stamp Begining for Sequential Processing Part
     seq_startTime = t.perf_counter()
@@ -91,3 +96,4 @@ if rank == 0:
     print(parallel_kmeans.centroids)
     print("Scikit KMeans")
     print(scikit_kmeans.cluster_centers_)
+    
