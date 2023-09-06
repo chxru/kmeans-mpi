@@ -2,15 +2,68 @@ from mpi4py import MPI
 import numpy as np
 from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
+import csv
+import os
+import pandas as pd
 
 np.random.seed(1234)
 
 K = 3
-N = 10000
 M = 2
 max_iter = 10
 
-X = np.random.rand(N, M)
+
+
+# Initialize MPI
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
+csv_directory = './data' 
+
+import os
+import csv
+import numpy as np
+
+def read_csv_files_in_directory(directory):
+    data_list = []
+
+    for filename in os.listdir(directory):
+        if filename.endswith(".csv"):
+            file_path = os.path.join(directory, filename)
+
+            with open(file_path, 'r', newline='') as csv_file:
+                csv_reader = csv.reader(csv_file)
+                data = [row for row in csv_reader]
+
+            data_list.extend(data)
+
+    numpy_array = np.array(data_list)
+
+    return numpy_array.astype(np.float64)
+
+X = read_csv_files_in_directory(csv_directory)
+
+
+
+
+csv_files = [os.path.join(csv_directory, file) for file in os.listdir(csv_directory) if file.endswith(".csv")]
+
+total_row_count = 0
+for file_path in csv_files:
+    with open(file_path, 'r') as file:
+        total_row_count += sum(1 for line in file)
+
+rows_per_process = total_row_count // size
+
+start_row = rank * rows_per_process
+
+end_row = start_row + rows_per_process
+
+for file_path in csv_files:
+    df = pd.read_csv(file_path, skiprows=range(1, start_row), nrows=rows_per_process)
+    
+N = total_row_count
 
 # MPI stuff
 comm = MPI.COMM_WORLD
@@ -20,8 +73,10 @@ size = comm.Get_size()
 # split data into chunks
 N_per_process = N // size
 
-# calculating kmeans in parallely
-data = X[rank * N_per_process : (rank + 1) * N_per_process]
+start_row = rank*N_per_process
+end_row = N_per_process*(rank+1)-1
+
+data = df.to_numpy()
 parallel_kmeans = ParallelKMeans(data=data, K=K, D=M)
 parallel_kmeans.fit(max_iter)
 
