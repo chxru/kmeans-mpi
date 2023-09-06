@@ -26,7 +26,14 @@ class ParallelKMeans(BaseKMeans):
         """
         self._centroids = value
 
-    def __init__(self, K: int, D: int, X: np.ndarray, iterations: int) -> None:
+    def __init__(
+        self,
+        K: int,
+        D: int,
+        X: np.ndarray,
+        iterations: int,
+        prev_centroids: np.ndarray = None,
+    ) -> None:
         super().__init__()
         self._K = K
         self._iterations = iterations
@@ -34,7 +41,7 @@ class ParallelKMeans(BaseKMeans):
         self._centroids = np.empty((K, D), dtype=np.float64)
         self._labels = None
 
-        self._initialize_centroids(X)
+        self._initialize_centroids(X, prev_centroids)
         self._initial_centroids = self._centroids.copy()
 
     def fit(self, X: np.ndarray):
@@ -57,7 +64,13 @@ class ParallelKMeans(BaseKMeans):
         distance = np.linalg.norm(X[:, None] - self._centroids, axis=2)
         return distance
 
-    def _initialize_centroids(self, X: np.ndarray) -> None:
+    def _initialize_centroids(
+        self, X: np.ndarray, prev_centroids: np.ndarray = None
+    ) -> None:
+        if prev_centroids is not None:
+            self._centroids = prev_centroids
+            return
+
         if rank == 0:
             centroid_indices = np.random.choice(len(X), self._K, replace=False)
             self._centroids = X[centroid_indices.tolist()]
@@ -69,6 +82,10 @@ class ParallelKMeans(BaseKMeans):
 
     def _update_centroids(self, X: np.ndarray) -> None:
         for i in range(self._K):
+            # if there is no data point assigned to this centroid, skip it
+            if len(X[self._labels == i]) == 0:
+                continue
+
             local_centroid = np.mean(X[self._labels == i], axis=0)
             local_centroid = comm.allreduce(local_centroid, op=MPI.SUM)
             self._centroids[i] = local_centroid / size
