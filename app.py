@@ -22,8 +22,8 @@ N_per_process = N // size
 
 # calculating kmeans in parallely
 data = X[rank * N_per_process : (rank + 1) * N_per_process]
-parallel_kmeans = ParallelKMeans(data=data, K=K, D=M)
-parallel_kmeans.fit(max_iter)
+parallel_kmeans = ParallelKMeans(X=data, K=K, D=M, iterations=max_iter)
+parallel_kmeans.fit(data)
 
 
 if rank == 0:

@@ -26,48 +26,66 @@ class ParallelKMeans(BaseKMeans):
         """
         self._centroids = value
 
-    def __init__(self, K: int, D: int, data: np.ndarray) -> None:
+    def __init__(
+        self,
+        K: int,
+        D: int,
+        X: np.ndarray,
+        iterations: int,
+        prev_centroids: np.ndarray = None,
+    ) -> None:
         super().__init__()
         self._K = K
-        self._data = data
+        self._iterations = iterations
+
         self._centroids = np.empty((K, D), dtype=np.float64)
         self._labels = None
 
-        self._initialize_centroids(K)
+        self._initialize_centroids(X, prev_centroids)
         self._initial_centroids = self._centroids.copy()
 
-    def fit(self, iterations: int):
-        for _ in range(iterations):
+    def fit(self, X: np.ndarray):
+        for _ in range(self._iterations):
             # calculate the distance between each data point and the centroids
-            distance = self._calculate_euclidean_distance()
+            distance = self._calculate_euclidean_distance(X)
 
             # find the closest centroid for each data point
             self._labels = np.argmin(distance, axis=1)
 
             # update the centroids
-            self._update_centroids()
+            self._update_centroids(X)
 
     def predict(self, X):
         super().predict()
         distance = np.linalg.norm(X[:, None] - self._centroids, axis=2)
         return np.argmin(distance, axis=1)
 
-    def _calculate_euclidean_distance(self) -> np.ndarray:
-        distance = np.linalg.norm(self._data[:, None] - self._centroids, axis=2)
+    def _calculate_euclidean_distance(self, X: np.ndarray) -> np.ndarray:
+        distance = np.linalg.norm(X[:, None] - self._centroids, axis=2)
         return distance
 
-    def _initialize_centroids(self, K: int) -> None:
+    def _initialize_centroids(
+        self, X: np.ndarray, prev_centroids: np.ndarray = None
+    ) -> None:
+        if prev_centroids is not None:
+            self._centroids = prev_centroids
+            return
+
         if rank == 0:
-            centroid_indices = np.random.choice(len(self._data), K, replace=False)
-            self._centroids = self._data[centroid_indices.tolist()]
+            centroid_indices = np.random.choice(len(X), self._K, replace=False)
+            self._centroids = X[centroid_indices.tolist()]
 
             # broadcast the centroids to all processes
             comm.bcast(self._centroids, root=0)
         else:
             self._centroids = comm.bcast(self._centroids, root=0)
 
-    def _update_centroids(self):
+    def _update_centroids(self, X: np.ndarray) -> None:
         for i in range(self._K):
-            local_centroid = np.mean(self._data[self._labels == i], axis=0)
+            # if there is no data point assigned to this centroid, skip it
+            if len(X[self._labels == i]) == 0:
+                continue
+
+            local_centroid = np.mean(X[self._labels == i], axis=0)
             local_centroid = comm.allreduce(local_centroid, op=MPI.SUM)
             self._centroids[i] = local_centroid / size

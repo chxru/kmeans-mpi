@@ -1,0 +1,4 @@
+K = 3
+N = 10000
+M = 2
+ITERATIONS = 10
