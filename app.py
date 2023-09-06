@@ -14,23 +14,24 @@ K = 3
 M = 2
 max_iter = 10
 
-#counting the number of rows
+# counting the number of rows
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-def count_csv_rows(csv_file):
 
+def count_csv_rows(csv_file):
     if rank == 0:
         if not os.path.exists(csv_file):
             writeFiles.main()
 
-    input_file = open(csv_file,'r+')
+    input_file = open(csv_file, "r+")
     reader_file = csv.reader(input_file)
     return len(list(reader_file))
 
-filename = 'data_1000.csv'
+
+filename = "data_1000.csv"
 
 N = count_csv_rows(filename)
 
@@ -38,24 +39,26 @@ N = count_csv_rows(filename)
 
 # split data into chunks
 N_per_process = N // size
-start_row = rank*N_per_process
-end_row = N_per_process*(rank+1)-1
+start_row = rank * N_per_process
+end_row = N_per_process * (rank + 1) - 1
 
-data = np.loadtxt(filename, delimiter=',', skiprows=start_row, max_rows=end_row-start_row+1)
+data = np.loadtxt(
+    filename, delimiter=",", skiprows=start_row, max_rows=end_row - start_row + 1
+)
 parallel_kmeans = ParallelKMeans(data=data, K=K, D=M, iterations=max_iter)
 parallel_kmeans.fit(data)
 
-#series part
+# series part
 if rank == 0:
 
     def load_data(filename):
         data = []
-        with open(filename, 'r') as csvfile:
+        with open(filename, "r") as csvfile:
             reader = csv.reader(csvfile)
             for row in reader:
                 data.append([float(x) for x in row])
         return np.array(data)
-    
+
     X = load_data(filename)
     # calculating kmeans sequentially
     sequential_kmeans = SequentialKMeans(K=K, D=M, data=X)
