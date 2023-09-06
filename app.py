@@ -38,13 +38,12 @@ N = count_csv_rows(filename)
 
 # split data into chunks
 N_per_process = N // size
-
 start_row = rank*N_per_process
 end_row = N_per_process*(rank+1)-1
 
 data = np.loadtxt(filename, delimiter=',', skiprows=start_row, max_rows=end_row-start_row+1)
-parallel_kmeans = ParallelKMeans(data=data, K=K, D=M)
-parallel_kmeans.fit(max_iter)
+parallel_kmeans = ParallelKMeans(data=data, K=K, D=M, iterations=max_iter)
+parallel_kmeans.fit(data)
 
 #series part
 if rank == 0:
