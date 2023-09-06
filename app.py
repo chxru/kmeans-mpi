@@ -3,6 +3,10 @@ import numpy as np
 from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
 import csv
+import writeFiles
+import os
+
+# Parrellel Part
 
 np.random.seed(1234)
 
@@ -10,32 +14,27 @@ K = 3
 M = 2
 max_iter = 10
 
-def load_data(filename):
-    data = []
-    with open(filename, 'r') as csvfile:
-        reader = csv.reader(csvfile)
-        for row in reader:
-            data.append([float(x) for x in row])
-    return np.array(data)
+#counting the number of rows
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
 def count_csv_rows(csv_file):
-    row_count = 0
-    with open(csv_file, 'r') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            row_count += 1
-    return row_count
+
+    if rank == 0:
+        if not os.path.exists(csv_file):
+            writeFiles.main()
+
+    input_file = open(csv_file,'r+')
+    reader_file = csv.reader(input_file)
+    return len(list(reader_file))
 
 filename = 'data_1000.csv'
-
-X = load_data(filename)
 
 N = count_csv_rows(filename)
 
 # MPI stuff
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
 
 # split data into chunks
 N_per_process = N // size
@@ -47,8 +46,18 @@ data = np.loadtxt(filename, delimiter=',', skiprows=start_row, max_rows=end_row-
 parallel_kmeans = ParallelKMeans(data=data, K=K, D=M)
 parallel_kmeans.fit(max_iter)
 
-
+#series part
 if rank == 0:
+
+    def load_data(filename):
+        data = []
+        with open(filename, 'r') as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                data.append([float(x) for x in row])
+        return np.array(data)
+    
+    X = load_data(filename)
     # calculating kmeans sequentially
     sequential_kmeans = SequentialKMeans(K=K, D=M, data=X)
     sequential_kmeans.initial_centroids = parallel_kmeans.initial_centroids
