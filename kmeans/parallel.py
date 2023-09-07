@@ -1,5 +1,6 @@
 from mpi4py import MPI
 import numpy as np
+import time as t
 
 from kmeans.base import BaseKMeans
 
@@ -35,6 +36,7 @@ class ParallelKMeans(BaseKMeans):
         prev_centroids: np.ndarray = None,
     ) -> None:
         super().__init__()
+        self._communication_time = 0
         self._K = K
         self._iterations = iterations
 
@@ -43,6 +45,7 @@ class ParallelKMeans(BaseKMeans):
 
         self._initialize_centroids(X, prev_centroids)
         self._initial_centroids = self._centroids.copy()
+        
 
     def fit(self, X: np.ndarray):
         for _ in range(self._iterations):
@@ -54,6 +57,9 @@ class ParallelKMeans(BaseKMeans):
 
             # update the centroids
             self._update_centroids(X)
+        # Print the Communication Time
+        print(f"Communication time takes {self._communication_time:0.4f} seconds for processor {rank+1}")
+        
 
     def predict(self, X):
         super().predict()
@@ -75,10 +81,16 @@ class ParallelKMeans(BaseKMeans):
             centroid_indices = np.random.choice(len(X), self._K, replace=False)
             self._centroids = X[centroid_indices.tolist()]
 
+            start_time_for_Broadcast = t.perf_counter()
             # broadcast the centroids to all processes
             comm.bcast(self._centroids, root=0)
+            end_time_for_Broadcast = t.perf_counter()
+            self._communication_time += (end_time_for_Broadcast-start_time_for_Broadcast)
         else:
+            start_time_for_Bcast = t.perf_counter()
             self._centroids = comm.bcast(self._centroids, root=0)
+            end_time_for_Bcast = t.perf_counter()
+            self._communication_time += (end_time_for_Bcast-start_time_for_Bcast)
 
     def _update_centroids(self, X: np.ndarray) -> None:
         for i in range(self._K):
@@ -87,5 +99,8 @@ class ParallelKMeans(BaseKMeans):
                 continue
 
             local_centroid = np.mean(X[self._labels == i], axis=0)
+            start_time_for_all_reduce = t.perf_counter()
             local_centroid = comm.allreduce(local_centroid, op=MPI.SUM)
+            end_time_for_all_reduce = t.perf_counter()
+            self._communication_time += (end_time_for_all_reduce-start_time_for_all_reduce)
             self._centroids[i] = local_centroid / size
