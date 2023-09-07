@@ -6,9 +6,14 @@ from constants import ITERATIONS, K, M
 from data.csv import count_csv_rows, genereate_csv, load_csv_data
 from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
+import time as t
+
 
 # set seed for reproducibility
 np.random.seed(1234)
+
+# Data Loader Start Time
+dt_StartTime = t.perf_counter()
 
 # MPI stuff
 comm = MPI.COMM_WORLD
@@ -35,17 +40,40 @@ data = np.loadtxt(
     max_rows=end_row - start_row + 1,
 )
 
+# Data loader End Time
+dt_endTime = t.perf_counter()
+print(f"Data Loader takes {dt_endTime - dt_StartTime:0.4f} seconds for processor {rank+1}")
+
+# Time Stamp Begining for Parallel Processing Part
+para_startTime = t.perf_counter()
 # parallel part
 parallel_kmeans = ParallelKMeans(X=data, K=K, D=M, iterations=ITERATIONS)
 parallel_kmeans.fit(data)
+# Time Stamp End for Parallel Processing Part
+para_endTime = t.perf_counter()
+print(f"Parallel Processing takes {para_endTime - para_startTime:0.4f} seconds for processor {rank+1}")
+print(f"Whole Processing takes {para_endTime - dt_StartTime:0.4f} seconds for processor {rank+1}")
 
 if rank == 0:
+    # Data Loader Start time for Sequential and Scikit Processing 
+    dta_startTime = t.perf_counter()
     X = load_csv_data(filename)
+    # Data Loader End time for Sequential and Scikit Processing 
+    dta_endTime = t.perf_counter()
+    print(f"Alternate Data Loader takes {dta_endTime - dta_startTime:0.4f} seconds for processor {rank+1}")
 
+    # Time Stamp Begining for Sequential Processing Part
+    seq_startTime = t.perf_counter()
     # calculating kmeans sequentially
     sequential_kmeans = SequentialKMeans(K=K, D=M, data=X)
     sequential_kmeans.initial_centroids = parallel_kmeans.initial_centroids
     sequential_kmeans.fit(ITERATIONS)
+    # Time Stamp Ending for Sequential Processing Part
+    seq_endTime = t.perf_counter()
+    print(f"Sequential Processing takes {para_endTime - para_startTime:0.4f} seconds for processor {rank+1}")
+
+    # Time Stamp Begining for Scikit Processing Part
+    sci_startTime = t.perf_counter()
 
     # validating results with Scikit learn library
     from sklearn.cluster import KMeans as SciktKMeans
@@ -57,6 +85,9 @@ if rank == 0:
         random_state=123,
         max_iter=ITERATIONS,
     ).fit(X)
+    # Time Stamp end for Scikit Processing Part
+    sci_endTime = t.perf_counter()
+    print(f"Scikit Processing takes {sci_endTime - sci_startTime:0.4f} seconds for processor {rank+1}")
 
     # comparing results
     print("Sequential KMeans")
@@ -65,3 +96,4 @@ if rank == 0:
     print(parallel_kmeans.centroids)
     print("Scikit KMeans")
     print(scikit_kmeans.cluster_centers_)
+    
