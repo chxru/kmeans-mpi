@@ -3,7 +3,7 @@ import os
 import numpy as np
 from mpi4py import MPI
 from constants import ITERATIONS, K, M
-from data.csv import count_csv_rows, genereate_csv, load_csv_data
+from data.generate_csv import count_csv_rows, genereate_csv, load_csv_data
 from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
 

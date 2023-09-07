@@ -1,6 +1,7 @@
+import csv
+import os
 import random
 import sys
-import csv
 
 import numpy as np
 
@@ -9,6 +10,10 @@ def genereate_csv(file_name: str, num_rows: int) -> None:
     """
     Generate a CSV file with the given number of rows.
     """
+    # skip if file already exists
+    if os.path.exists(file_name):
+        return
+
     with open(file_name, mode="w", newline="") as file:
         writer = csv.writer(file)
         for _ in range(num_rows):
@@ -37,3 +42,15 @@ def load_csv_data(filename):
         for row in reader:
             data.append([float(x) for x in row])
     return np.array(data)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python csv.py <num_rows>")
+        sys.exit(1)
+
+    # get number of rows from command line
+    num_rows = int(sys.argv[1])
+
+    # generate CSV files
+    genereate_csv(f"data/data_{num_rows}.csv", num_rows)
