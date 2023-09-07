@@ -1,7 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 from constants import ITERATIONS, K, M
-from data.generate_csv import read_csv_files_in_directory
+from data.csv_utils import read_csv_files_in_directory
 from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
 import csv
@@ -25,7 +25,7 @@ csv_files = [
 
 if len(csv_files) == 0:
     raise Exception(
-        "No CSV files found in the data directory. Run python data/genereate_csv.py [number of rows] to generate CSV files."
+        "No CSV files found in the data directory. Run python data/csv_utils.py [number of rows] to generate CSV files."
     )
 
 total_row_count = 0
