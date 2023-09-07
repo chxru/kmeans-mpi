@@ -44,6 +44,19 @@ def load_csv_data(filename):
     return np.array(data)
 
 
+def read_csv_files_in_directory(directory):
+    data_list = []
+    for filename in os.listdir(directory):
+        if filename.endswith(".csv"):
+            file_path = os.path.join(directory, filename)
+            with open(file_path, "r", newline="") as csv_file:
+                csv_reader = csv.reader(csv_file)
+                data = [row for row in csv_reader]
+            data_list.extend(data)
+    numpy_array = np.array(data_list)
+    return numpy_array.astype(np.float64)
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python csv.py <num_rows>")
