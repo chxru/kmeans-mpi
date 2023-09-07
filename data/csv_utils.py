@@ -57,6 +57,10 @@ def read_csv_files_in_directory(directory):
 
 
 def multifile_loadbalancer(path: str, n: int) -> dict:
+    """
+    chunk the content of the CSV files in the given path into n processes
+    @return: a dictionary with the process number as key and a list of files with starting and ending lines
+    """
     # os listdir and filter with .csv
     files = [f for f in os.listdir(path) if f.endswith(".csv")]
 
@@ -71,54 +75,46 @@ def multifile_loadbalancer(path: str, n: int) -> dict:
     # get number of rows per process
     rows_per_process = total_rows // n
 
-    offset = 0
-    done_files = []
+    file_offset = 0
     final_dict = {}
-
+    done_files = []
     for i in range(n):
         final_dict[i] = []
 
-    # iterate through each process
+    # loop for each process
     for i in range(n):
         missing_rows = rows_per_process
 
         for file in files:
-            if file not in done_files:
-                # check whether the file has enough rows
-                if offset + missing_rows <= file_dict[file]:
-                    # if so, start with the previous offset until the missing rows
-                    final_dict[i].append(
-                        {
-                            "file": file,
-                            "start": offset,
-                            "end": offset + missing_rows,
-                        }
-                    )
+            # skip if file has been read completely
+            if file in done_files:
+                continue
 
-                    if offset + missing_rows == file_dict[file]:
-                        # has reached end of the file
-                        done_files.append(file)
-                        offset = 0
-                    else:
-                        offset += missing_rows
+            file_rows = file_dict[file]
+            #  check whether the file has enough rows
+            if file_rows > missing_rows + file_offset:
+                final_dict[i].append(
+                    {
+                        "file": file,
+                        "start": file_offset,
+                        "end": file_offset + missing_rows,
+                    }
+                )
 
-                    # break if necessary rows per process has been reached
-                    break
-                else:
-                    final_dict[i].append(
-                        {
-                            "file": file,
-                            "start": offset,
-                            "end": file_dict[file],
-                        }
-                    )
+                file_offset += missing_rows
+                if file_offset == file_rows:
+                    file_offset = 0
                     done_files.append(file)
-
-                    missing_rows = file_dict[file] - offset
-                    offset = 0
-                    if missing_rows < 0:
-                        missing_rows = 0
-                        break
+                break
+            else:
+                final_dict[i].append(
+                    {"file": file, "start": file_offset, "end": file_rows}
+                )
+                done_files.append(file)
+                missing_rows -= file_rows - file_offset
+                file_offset = 0
+                if missing_rows <= 0:
+                    break
 
     for i in final_dict:
         print(f"Process {i}: {final_dict[i]}")

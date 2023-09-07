@@ -4,7 +4,6 @@ from constants import ITERATIONS, K, M
 from data.csv_utils import multifile_loadbalancer, read_csv_files_in_directory
 from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
-import csv
 import os
 import pandas as pd
 
