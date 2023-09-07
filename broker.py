@@ -4,6 +4,7 @@ import redis
 from mpi4py import MPI
 from constants import ITERATIONS, K, M
 from kmeans.parallel import ParallelKMeans
+import time as t
 
 
 # MPI stuff
@@ -22,6 +23,9 @@ prev_centroids = None
 
 
 def do_kmeans(data: np.ndarray) -> None:
+    # do_Kmeans Start Time 
+    #km_startTime = t.perf_counter()
+
     global prev_centroids
 
     parallel_kmeans = ParallelKMeans(
@@ -39,9 +43,16 @@ def do_kmeans(data: np.ndarray) -> None:
     if rank == 0:
         print(parallel_kmeans.centroids)
 
+    # do_Kmeans End Time 
+    #km_endTime = t.perf_counter()
+    #print(f"kMeans process takes {km_endTime - km_startTime:0.4f} seconds for processor {rank+1}")
+
 
 def listen_queue() -> None:
     while True:
+        # Queued Process Starting Time 
+        que_startTime  = t.perf_counter()
+        
         queue_length = r.llen("queue")
 
         if queue_length > bulk_size:
@@ -65,6 +76,10 @@ def listen_queue() -> None:
         else:
             print(f"Process {rank} waiting for data")
             time.sleep(1)
+        
+        # Queued Process Ending Time 
+        que_endTime  = t.perf_counter()
+        print(f"Queued process takes {que_endTime - que_startTime:0.4f} seconds for processor {rank+1}")
 
 
 if __name__ == "__main__":
