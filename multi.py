@@ -1,7 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 from constants import ITERATIONS, K, M
-from data.generate_csv import read_csv_files_in_directory
+from data.csv_utils import multifile_loadbalancer, read_csv_files_in_directory
 from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
 import csv
@@ -15,45 +15,44 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
+
 csv_directory = "./data"
+if rank == 0:
+    balance_dict = multifile_loadbalancer(csv_directory, size)
 
-csv_files = [
-    os.path.join(csv_directory, file)
-    for file in os.listdir(csv_directory)
-    if file.endswith(".csv")
-]
+    # broadcast balance_dict to all processes
+    comm.bcast(balance_dict, root=0)
 
-if len(csv_files) == 0:
-    raise Exception(
-        "No CSV files found in the data directory. Run python data/genereate_csv.py [number of rows] to generate CSV files."
-    )
+else:
+    balance_dict = comm.bcast(None, root=0)
 
-total_row_count = 0
-for file_path in csv_files:
-    input_file = open(file_path, "r+")
-    reader_file = csv.reader(input_file)
-    total_row_count += len(list(reader_file))
+# get the files that this process will read
+files_to_read = balance_dict[rank]
 
-rows_per_process = total_row_count // size
-start_row = rank * rows_per_process
-end_row = start_row + rows_per_process
+# create empty dataframe
+df = None
 
-for file_path in csv_files:
-    df = pd.read_csv(file_path, skiprows=range(1, start_row), nrows=rows_per_process)
+for file in files_to_read:
+    file_path = os.path.join(csv_directory, file["file"])
 
-N = total_row_count
+    if df is None:
+        df = pd.read_csv(
+            file_path,
+            skiprows=range(1, file["start"]),
+            nrows=file["end"],
+            names=["x", "y"],
+        )
+    else:
+        temp = pd.read_csv(
+            file_path,
+            skiprows=range(1, file["start"]),
+            nrows=file["end"],
+            names=["x", "y"],
+        )
 
-# MPI stuff
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+        df = pd.concat([df, temp], axis=0, ignore_index=True)
 
-# split data into chunks
-N_per_process = N // size
-
-# convert data into numpy format before passing to parallel kmeans
 data = df.to_numpy()
-
 
 parallel_kmeans = ParallelKMeans(X=data, K=K, D=M, iterations=ITERATIONS)
 parallel_kmeans.fit(data)
