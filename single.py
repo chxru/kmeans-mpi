@@ -1,4 +1,3 @@
-import os
 import numpy as np
 from mpi4py import MPI
 from constants import ITERATIONS, K, M
@@ -7,110 +6,66 @@ from kmeans.parallel import ParallelKMeans
 from kmeans.sequential import SequentialKMeans
 import time as t
 
+from logger import log
 
-# set seed for reproducibility
-np.random.seed(1234)
 
-# Data Loader Start Time
+def main(rows: int):
+    # data source
+    filename = f"./data/data_{rows}.csv"
+    genereate_csv(filename, rows)
 
-# MPI stuff
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+    # set seed for reproducibility
+    np.random.seed(1234)
 
-# data source
-filename = "./data/data_1000.csv"
-genereate_csv(filename, 1000)
+    # MPI stuff
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
 
-# split data into chunks
-dt_StartTime = t.perf_counter()  # Data Loader Start Time
+    """
+    DATA LOADING
+    """
+    dl_start_timer = t.perf_counter_ns()  # Data Loader Start Time
 
-N = count_csv_rows(filename)
-N_per_process = N // size
-start_row = rank * N_per_process
-end_row = N_per_process * (rank + 1) - 1
+    # split data into chunks
+    N = count_csv_rows(filename)
+    N_per_process = N // size
+    start_row = rank * N_per_process
+    end_row = N_per_process * (rank + 1) - 1
 
-data = np.loadtxt(
-    filename,
-    delimiter=",",
-    skiprows=start_row,
-    max_rows=end_row - start_row + 1,
-)
-
-dt_endTime = t.perf_counter()  # Data Loader End Time
-
-print(
-    f"Data Loader takes {dt_endTime - dt_StartTime:0.4f} seconds for processor {rank+1}"
-)
-
-# parallel part
-para_startTime = t.perf_counter()  # Parallel Processing Start Time
-
-parallel_kmeans = ParallelKMeans(X=data, K=K, D=M, iterations=ITERATIONS)
-parallel_kmeans.fit(data)
-
-para_endTime = t.perf_counter()  # Parallel Processing End Time
-print(
-    f"Parallel Processing takes {para_endTime - para_startTime:0.4f} seconds for processor {rank+1}"
-)
-
-print(
-    f"Whole Processing takes {para_endTime - dt_StartTime:0.4f} seconds for processor {rank+1}"
-)
-
-if rank == 0:
-    # Data Loader Start time for Sequential and Scikit Processing
-    dta_startTime = t.perf_counter()
-
-    X = load_csv_data(filename)
-
-    # Data Loader End time for Sequential and Scikit Processing
-    dta_endTime = t.perf_counter()
-
-    print(
-        f"Alternate Data Loader takes {dta_endTime - dta_startTime:0.4f} seconds for processor {rank+1}"
+    data = np.loadtxt(
+        filename,
+        delimiter=",",
+        skiprows=start_row,
+        max_rows=end_row - start_row + 1,
     )
 
-    # Time Stamp Begining for Sequential Processing Part
-    seq_startTime = t.perf_counter()
+    log("loader", rank, t.perf_counter_ns() - dl_start_timer)
 
-    # calculating kmeans sequentially
-    sequential_kmeans = SequentialKMeans(K=K, D=M, data=X)
-    sequential_kmeans.initial_centroids = parallel_kmeans.initial_centroids
-    sequential_kmeans.fit(ITERATIONS)
+    """
+    PROCESSING
+    """
 
-    # Time Stamp Ending for Sequential Processing Part
-    seq_endTime = t.perf_counter()
+    process_start_timer = t.perf_counter_ns()  # Parallel Processing Start Time
 
-    print(
-        f"Sequential Processing takes {para_endTime - para_startTime:0.4f} seconds for processor {rank+1}"
-    )
+    parallel_kmeans = ParallelKMeans(X=data, K=K, D=M, iterations=ITERATIONS)
+    parallel_kmeans.fit(data)
 
-    # Time Stamp Begining for Scikit Processing Part
-    sci_startTime = t.perf_counter()
+    log("processing", rank, t.perf_counter_ns() - process_start_timer)
 
-    # validating results with Scikit learn library
-    from sklearn.cluster import KMeans as SciktKMeans
 
-    scikit_kmeans = SciktKMeans(
-        n_init="auto",
-        init=parallel_kmeans.initial_centroids,
-        n_clusters=K,
-        random_state=123,
-        max_iter=ITERATIONS,
-    ).fit(X)
+if __name__ == "__main__":
+    import sys
 
-    # Time Stamp end for Scikit Processing Part
-    sci_endTime = t.perf_counter()
+    # check for command line argument
+    if len(sys.argv) != 2:
+        print("Usage: python3 single.py <n>")
+        exit(1)
 
-    print(
-        f"Scikit Processing takes {sci_endTime - sci_startTime:0.4f} seconds for processor {rank+1}"
-    )
+    # get n from command line
+    n = int(sys.argv[1])
+    if n < 1:
+        print("n must be greater than 0")
+        exit(1)
 
-    # comparing results
-    print("Sequential KMeans")
-    print(sequential_kmeans.centroids)
-    print("Parallel KMeans")
-    print(parallel_kmeans.centroids)
-    print("Scikit KMeans")
-    print(scikit_kmeans.cluster_centers_)
+    main(n)
