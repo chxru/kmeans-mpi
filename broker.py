@@ -3,6 +3,7 @@ import numpy as np
 import redis
 from mpi4py import MPI
 from constants import ITERATIONS, K, M
+from data.utils import reduce_data_points
 from kmeans.parallel import ParallelKMeans
 import time as t
 
@@ -19,7 +20,10 @@ bulk_size = (
     size * per_process_data
 )  # cheaky way to make sure each process gets equal amount of data
 
-prev_centroids = None
+prev_centroids: np.ndarray = (
+    None  # this is used to save the centroids from the previous iteration
+)
+saved_data: np.ndarray = None  # this is used to save the previous data points
 
 
 def do_kmeans(data: np.ndarray) -> None:
@@ -67,12 +71,31 @@ def listen_queue() -> None:
             # convert data to np.array
             data = np.array(data)
 
+            global saved_data
+
+            # if data hsa been previously saved, concatenate it with the new data
+            if saved_data is not None:
+                data = np.concatenate((saved_data, data))
+
             kmeans_start_time = t.perf_counter()
             do_kmeans(data)
 
             print(
                 f"Process {rank} kmeans took {t.perf_counter() - kmeans_start_time:0.4f} seconds"
             )
+
+            # reduce the number of data points, to preserve memory
+            points = reduce_data_points(data, rank)
+
+            # save the reduced data points for the next iteration
+            saved_data = points
+
+            # uncomment this part if you want to see the data points
+            # import matplotlib.pyplot as plt
+
+            # plt.scatter(data[:, 0], data[:, 1])
+            # plt.scatter(points[:, 0], points[:, 1], c="red")
+            # plt.show()
 
             time.sleep(3)
         else:
